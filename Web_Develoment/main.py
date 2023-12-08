@@ -1,67 +1,104 @@
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.common.by import By
 import time
 
-chrome_driver_path = "YOUR CHROME DRIVER PATH"
-driver = webdriver.Chrome(chrome_driver_path)
-driver.get("http://orteil.dashnet.org/experiments/cookie/")
+ACCOUNT_EMAIL = "YOUR LOGIN EMAIL"
+ACCOUNT_PASSWORD = "YOUR LOGIN PASSWORD"
+PHONE = "YOUR PHONE NUMBER"
 
-#Get cookie to click on.
-cookie = driver.find_element_by_id("cookie")
 
-#Get upgrade item ids.
-items = driver.find_elements_by_css_selector("#store div")
-item_ids = [item.get_attribute("id") for item in items]
+def abort_application():
+    # Click Close Button
+    close_button = driver.find_element(by=By.CLASS_NAME, value="artdeco-modal__dismiss")
+    close_button.click()
 
-timeout = time.time() + 5
-five_min = time.time() + 60*5 # 5minutes
+    time.sleep(2)
+    # Click Discard Button
+    discard_button = driver.find_elements(by=By.CLASS_NAME, value="artdeco-modal__confirm-dialog-btn")[1]
+    discard_button.click()
 
-while True:
-    cookie.click()
 
-    #Every 5 seconds:
-    if time.time() > timeout:
+chrome_driver_path = "YOUR CHROME DRIVER PATH"
 
-        #Get all upgrade <b> tags
-        all_prices = driver.find_elements_by_css_selector("#store b")
-        item_prices = []
+# Optional - Automatically keep your chromedriver up to date.
+from webdriver_manager.chrome import ChromeDriverManager  # pip install webdriver-manager
+chrome_driver_path = ChromeDriverManager(path="YOUR CHROME DRIVER FOLDER").install()
 
-        #Convert <b> text into an integer price.
-        for price in all_prices:
-            element_text = price.text
-            if element_text != "":
-                cost = int(element_text.split("-")[1].strip().replace(",", ""))
-                item_prices.append(cost)
+# Optional - Keep the browser open if the script crashes.
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_experimental_option("detach", True)
 
-        #Create dictionary of store items and prices
-        cookie_upgrades = {}
-        for n in range(len(item_prices)):
-            cookie_upgrades[item_prices[n]] = item_ids[n]
+service = ChromeService(executable_path=chrome_driver_path)
+driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        #Get current cookie count
-        money_element = driver.find_element_by_id("money").text
-        if "," in money_element:
-            money_element = money_element.replace(",", "")
-        cookie_count = int(money_element)
+driver.get("https://www.linkedin.com/jobs/search/?currentJobId=3586148395&f_LF=f_AL&geoId=101356765&"
+           "keywords=python&location=London%2C%20England%2C%20United%20Kingdom&refresh=true")
 
-        #Find upgrades that we can currently afford
-        affordable_upgrades = {}
-        for cost, id in cookie_upgrades.items():
-            if cookie_count > cost:
-                 affordable_upgrades[cost] = id
+# Click Reject Cookies Button
+time.sleep(2)
+reject_button = driver.find_element(by=By.CSS_SELECTOR, value='button[action-type="DENY"]')
+reject_button.click()
 
-        #Purchase the most expensive affordable upgrade
-        highest_price_affordable_upgrade = max(affordable_upgrades)
-        print(highest_price_affordable_upgrade)
-        to_purchase_id = affordable_upgrades[highest_price_affordable_upgrade]
+# Click Sign in Button
+time.sleep(2)
+sign_in_button = driver.find_element(by=By.LINK_TEXT, value="Sign in")
+sign_in_button.click()
 
-        driver.find_element_by_id(to_purchase_id).click()
-        
-        #Add another 5 seconds until the next check
-        timeout = time.time() + 5
+# Sign in
+time.sleep(5)
+email_field = driver.find_element(by=By.ID, value="username")
+email_field.send_keys(ACCOUNT_EMAIL)
+password_field = driver.find_element(by=By.ID, value="password")
+password_field.send_keys(ACCOUNT_PASSWORD)
+password_field.send_keys(Keys.ENTER)
 
-    #After 5 minutes stop the bot and check the cookies per second count.
-    if time.time() > five_min:
-        cookie_per_s = driver.find_element_by_id("cps").text
-        print(cookie_per_s)
-        break
+# CAPTCHA - Solve Puzzle Manually
+input("Press Enter when you have solved the Captcha")
 
+# Get Listings
+time.sleep(5)
+all_listings = driver.find_elements(by=By.CSS_SELECTOR, value=".job-card-container--clickable")
+
+# Apply for Jobs
+for listing in all_listings:
+    print("Opening Listing")
+    listing.click()
+    time.sleep(2)
+    try:
+        # Click Apply Button
+        apply_button = driver.find_element(by=By.CSS_SELECTOR, value=".jobs-s-apply button")
+        apply_button.click()
+
+        # Insert Phone Number
+        # Find an <input> element where the id contains phoneNumber
+        time.sleep(5)
+        phone = driver.find_element(by=By.CSS_SELECTOR, value="input[id*=phoneNumber]")
+        if phone.text == "":
+            phone.send_keys(PHONE)
+
+        # Check the Submit Button
+        submit_button = driver.find_element(by=By.CSS_SELECTOR, value="footer button")
+        if submit_button.get_attribute("data-control-name") == "continue_unify":
+            abort_application()
+            print("Complex application, skipped.")
+            continue
+        else:
+            # Click Submit Button
+            print("Submitting job application")
+            submit_button.click()
+
+        time.sleep(2)
+        # Click Close Button
+        close_button = driver.find_element(by=By.CLASS_NAME, value="artdeco-modal__dismiss")
+        close_button.click()
+
+    except NoSuchElementException:
+        abort_application()
+        print("No application button, skipped.")
+        continue
+
+time.sleep(5)
+driver.quit()
