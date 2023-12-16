@@ -1,60 +1,52 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import ElementClickInterceptedException, NoSuchElementException
-from time import sleep
+import time
 
-FB_EMAIL = YOUR FACEBOOK LOGIN EMAIL
-FB_PASSWORD = YOUR FACEBOOK PASSWORD
+PROMISED_DOWN = 150
+PROMISED_UP = 10
+CHROME_DRIVER_PATH = "YOUR CHROME DRIVER PATH"
+TWITTER_EMAIL = "YOUR TWITTER EMAIL"
+TWITTER_PASSWORD = "YOUR TWITTER PASSWORD"
 
-chrome_driver_path = YOUR CHROME DRIVER PATH
-driver = webdriver.Chrome(executable_path=chrome_driver_path)
 
-driver.get("http://www.tinder.com")
+class InternetSpeedTwitterBot:
+    def __init__(self, driver_path):
+        self.driver = webdriver.Chrome(executable_path=driver_path)
+        self.up = 0
+        self.down = 0
 
-sleep(2)
-login_button = driver.find_element_by_xpath('//*[@id="content"]/div/div[1]/div/main/div[1]/div/div/header/div[1]/div[2]/div/button')
-login_button.click()
+    def get_internet_speed(self):
+        self.driver.get("https://www.speedtest.net/")
+        # accept_button = self.driver.find_element_by_id("_evidon-banner-acceptbutton")
+        # accept_button.click()
+        # time.sleep(3)
 
-sleep(2)
-fb_login = driver.find_element_by_xpath('//*[@id="modal-manager"]/div/div/div[1]/div/div[3]/span/div[2]/button')
-fb_login.click()
+        go_button = self.driver.find_element_by_css_selector(".start-button a")
+        go_button.click()
+        time.sleep(60)
+        self.up = self.driver.find_element_by_xpath('//*[@id="container"]/div/div[3]/div/div/div/div[2]/div[3]/div[3]/div/div[3]/div/div/div[2]/div[1]/div[2]/div/div[2]/span').text
+        self.down = self.driver.find_element_by_xpath('//*[@id="container"]/div/div[3]/div/div/div/div[2]/div[3]/div[3]/div/div[3]/div/div/div[2]/div[1]/div[3]/div/div[2]/span').text
 
-sleep(2)
-base_window = driver.window_handles[0]
-fb_login_window = driver.window_handles[1]
-driver.switch_to.window(fb_login_window)
-print(driver.title)
+    def tweet_at_provider(self):
+        self.driver.get("https://twitter.com/login")
+        time.sleep(2)
+        email = self.driver.find_element_by_xpath('//*[@id="react-root"]/div/div/div[2]/main/div/div/div[1]/form/div/div[1]/label/div/div[2]/div/input')
+        password = self.driver.find_element_by_xpath('//*[@id="react-root"]/div/div/div[2]/main/div/div/div[1]/form/div/div[2]/label/div/div[2]/div/input')
+        email.send_keys(TWITTER_EMAIL)
+        password.send_keys(TWITTER_PASSWORD)
+        time.sleep(2)
+        password.send_keys(Keys.ENTER)
+        time.sleep(5)
+        tweet_compose = self.driver.find_element_by_xpath('//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div/div/div[2]/div/div[2]/div[1]/div/div/div/div[2]/div[1]/div/div/div/div/div/div/div/div/div/div[1]/div/div/div/div[2]/div/div/div/div')
+        tweet = f"Hey Internet Provider, why is my internet speed {self.down}down/{self.up}up when I pay for {PROMISED_DOWN}down/{PROMISED_UP}up?"
+        tweet_compose.send_keys(tweet)
+        time.sleep(3)
+        tweet_button = self.driver.find_element_by_xpath('//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div/div/div[2]/div/div[2]/div[1]/div/div/div/div[2]/div[4]/div/div/div[2]/div[3]')
+        tweet_button.click()
+        time.sleep(2)
+        self.driver.quit()
 
-email = driver.find_element_by_xpath('//*[@id="email"]')
-password = driver.find_element_by_xpath('//*[@id="pass"]')
 
-email.send_keys(FB_EMAIL)
-password.send_keys(FB_PASSWORD)
-password.send_keys(Keys.ENTER)
-
-driver.switch_to.window(base_window)
-print(driver.title)
-
-sleep(5)
-allow_location_button = driver.find_element_by_xpath('//*[@id="modal-manager"]/div/div/div/div/div[3]/button[1]')
-allow_location_button.click()
-notifications_button = driver.find_element_by_xpath('//*[@id="modal-manager"]/div/div/div/div/div[3]/button[2]')
-notifications_button.click()
-cookies = driver.find_element_by_xpath('//*[@id="content"]/div/div[2]/div/div/div[1]/button')
-cookies.click()
-
-for n in range(100):
-    sleep(1)
-    try:
-        print("called")
-        like_button = driver.find_element_by_xpath(
-            '//*[@id="content"]/div/div[1]/div/main/div[1]/div/div/div[1]/div/div[2]/div[4]/button')
-        like_button.click()
-    except ElementClickInterceptedException:
-        try:
-            match_popup = driver.find_element_by_css_selector(".itsAMatch a")
-            match_popup.click()
-        except NoSuchElementException:
-            sleep(2)
-
-driver.quit()
+bot = InternetSpeedTwitterBot(CHROME_DRIVER_PATH)
+bot.get_internet_speed()
+bot.tweet_at_provider()
