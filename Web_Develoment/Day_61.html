@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    {% block styles %}
+    <!-- Adding Bootstrap-Flask styling here -->
+    {{ bootstrap.load_css() }} {% endblock %}
+
+    <title>{% block title %}{% endblock %}</title>
+  </head>
+  <body>
+    {% block content %}{% endblock %}
+  </body>
+</html>
+
+
+
+// Index
+
+
+{% extends "base.html" %}
+{% block title %}Secrets{% endblock %}
+{% block content %}
+<!--Using Boostrap classes for styling here-->
+<div class="jumbotron">
+	<div class="container">
+		<h1>Welcome</h1>
+		<p>Are you ready to discover my secret?</p>
+		<a class="btn btn-primary btn-lg" href=" {{ url_for('login') }} ">Login</a>
+	</div>
+</div>
+{% endblock %}
