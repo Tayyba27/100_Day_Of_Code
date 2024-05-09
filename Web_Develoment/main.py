@@ -19,8 +19,12 @@ This will install the packages from requirements.txt for this project.
 app = Flask(__name__)
 
 # CREATE DATABASE
+
+
 class Base(DeclarativeBase):
     pass
+
+
 app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///books.db"
 # Create the extension
 db = SQLAlchemy(model_class=Base)
@@ -31,9 +35,11 @@ db.init_app(app)
 # CREATE TABLE
 class Book(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    title: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
+    title: Mapped[str] = mapped_column(
+        String(250), unique=True, nullable=False)
     author: Mapped[str] = mapped_column(String(250), nullable=False)
     rating: Mapped[float] = mapped_column(Float, nullable=False)
+
 
 # Create table schema in the database. Requires application context.
 with app.app_context():
@@ -46,7 +52,7 @@ def home():
     # Construct a query to select from the database. Returns the rows in the database
     result = db.session.execute(db.select(Book).order_by(Book.title))
     # Use .scalars() to get the elements rather than entire rows from the database
-    all_books = result.scalars()
+    all_books = result.scalars().all()
     return render_template("index.html", books=all_books)
 
 
