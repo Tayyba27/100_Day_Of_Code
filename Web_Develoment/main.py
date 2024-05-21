@@ -1,15 +1,11 @@
-from flask import Flask, render_template, redirect, url_for, request
-from flask_bootstrap import Bootstrap5
+from flask import Flask, jsonify, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, String, Float
-from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField
-from wtforms.validators import DataRequired
-import requests
+from sqlalchemy import Integer, String, Boolean
+import random
 
 '''
-Red underlines? Install the required packages first: 
+Install the required packages first: 
 Open the Terminal in PyCharm (bottom left). 
 
 On Windows type:
@@ -21,113 +17,115 @@ pip3 install -r requirements.txt
 This will install the packages from requirements.txt for this project.
 '''
 
-
-MOVIE_DB_API_KEY = "USE_YOUR_OWN_CODE"
-MOVIE_DB_SEARCH_URL = "https://api.themoviedb.org/3/search/movie"
-MOVIE_DB_INFO_URL = "https://api.themoviedb.org/3/movie"
-MOVIE_DB_IMAGE_URL = "https://image.tmdb.org/t/p/w500"
-
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
-Bootstrap5(app)
 
 # CREATE DB
 class Base(DeclarativeBase):
     pass
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movies.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafes.db'
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
+
 # CREATE TABLE
-class Movie(db.Model):
+class Cafe(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    title: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
-    year: Mapped[int] = mapped_column(Integer, nullable=False)
-    description: Mapped[str] = mapped_column(String(500), nullable=False)
-    rating: Mapped[float] = mapped_column(Float, nullable=True)
-    ranking: Mapped[int] = mapped_column(Integer, nullable=True)
-    review: Mapped[str] = mapped_column(String(250), nullable=True)
-    img_url: Mapped[str] = mapped_column(String(250), nullable=False)
+    name: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
+    map_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    img_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    location: Mapped[str] = mapped_column(String(250), nullable=False)
+    seats: Mapped[str] = mapped_column(String(250), nullable=False)
+    has_toilet: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    has_wifi: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    has_sockets: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    can_take_calls: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    coffee_price: Mapped[str] = mapped_column(String(250), nullable=True)
+
+    def to_dict(self):
+        return {column.name: getattr(self, column.name) for column in self.__table__.columns}
 
 
 with app.app_context():
     db.create_all()
 
 
-class FindMovieForm(FlaskForm):
-    title = StringField("Movie Title", validators=[DataRequired()])
-    submit = SubmitField("Add Movie")
-
-
-class RateMovieForm(FlaskForm):
-    rating = StringField("Your Rating Out of 10 e.g. 7.5")
-    review = StringField("Your Review")
-    submit = SubmitField("Done")
-
-
 @app.route("/")
 def home():
-    result = db.session.execute(db.select(Movie).order_by(Movie.rating))
-    all_movies = result.scalars().all()  # convert ScalarResult to Python List
+    return render_template("index.html")
 
-    for i in range(len(all_movies)):
-        all_movies[i].ranking = len(all_movies) - i
+
+@app.route("/random")
+def get_random_cafe():
+    result = db.session.execute(db.select(Cafe))
+    all_cafes = result.scalars().all()
+    random_cafe = random.choice(all_cafes)
+    return jsonify(cafe=random_cafe.to_dict())
+
+
+@app.route("/all")
+def get_all_cafes():
+    result = db.session.execute(db.select(Cafe).order_by(Cafe.name))
+    all_cafes = result.scalars().all()
+    return jsonify(cafes=[cafe.to_dict() for cafe in all_cafes])
+
+
+@app.route("/search")
+def get_cafe_at_location():
+    query_location = request.args.get("loc")
+    result = db.session.execute(db.select(Cafe).where(Cafe.location == query_location))
+    # Note, this may get more than one cafe per location
+    all_cafes = result.scalars().all()
+    if all_cafes:
+        return jsonify(cafes=[cafe.to_dict() for cafe in all_cafes])
+    else:
+        return jsonify(error={"Not Found": "Sorry, we don't have a cafe at that location."}), 404
+
+# Test this inside Postman. Request type: Post ->  Body ->  x-www-form-urlencoded
+@app.route("/add", methods=["POST"])
+def post_new_cafe():
+    new_cafe = Cafe(
+        name=request.form.get("name"),
+        map_url=request.form.get("map_url"),
+        img_url=request.form.get("img_url"),
+        location=request.form.get("loc"),
+        has_sockets=bool(request.form.get("sockets")),
+        has_toilet=bool(request.form.get("toilet")),
+        has_wifi=bool(request.form.get("wifi")),
+        can_take_calls=bool(request.form.get("calls")),
+        seats=request.form.get("seats"),
+        coffee_price=request.form.get("coffee_price"),
+    )
+    db.session.add(new_cafe)
     db.session.commit()
+    return jsonify(response={"success": "Successfully added the new cafe."})
 
-    return render_template("index.html", movies=all_movies)
-
-
-@app.route("/add", methods=["GET", "POST"])
-def add_movie():
-    form = FindMovieForm()
-    if form.validate_on_submit():
-        movie_title = form.title.data
-        response = requests.get(MOVIE_DB_SEARCH_URL, params={
-                                "api_key": MOVIE_DB_API_KEY, "query": movie_title})
-        data = response.json()["results"]
-        return render_template("select.html", options=data)
-    return render_template("add.html", form=form)
-
-
-@app.route("/find")
-def find_movie():
-    movie_api_id = request.args.get("id")
-    if movie_api_id:
-        movie_api_url = f"{MOVIE_DB_INFO_URL}/{movie_api_id}"
-        response = requests.get(movie_api_url, params={
-                                "api_key": MOVIE_DB_API_KEY, "language": "en-US"})
-        data = response.json()
-        new_movie = Movie(
-            title=data["title"],
-            year=data["release_date"].split("-")[0],
-            img_url=f"{MOVIE_DB_IMAGE_URL}{data['poster_path']}",
-            description=data["overview"]
-        )
-        db.session.add(new_movie)
+# Updating the price of a cafe based on a particular id:
+# http://127.0.0.1:5000/update-price/CAFE_ID?new_price=£5.67
+@app.route("/update-price/<int:cafe_id>", methods=["PATCH"])
+def patch_new_price(cafe_id):
+    new_price = request.args.get("new_price")
+    cafe = db.get_or_404(Cafe, cafe_id)
+    if cafe:
+        cafe.coffee_price = new_price
         db.session.commit()
-        return redirect(url_for("rate_movie", id=new_movie.id))
+        return jsonify(response={"success": "Successfully updated the price."}), 200
+    else:
+        return jsonify(error={"Not Found": "Sorry a cafe with that id was not found in the database."}), 404
 
-
-@app.route("/edit", methods=["GET", "POST"])
-def rate_movie():
-    form = RateMovieForm()
-    movie_id = request.args.get("id")
-    movie = db.get_or_404(Movie, movie_id)
-    if form.validate_on_submit():
-        movie.rating = float(form.rating.data)
-        movie.review = form.review.data
-        db.session.commit()
-        return redirect(url_for('home'))
-    return render_template("edit.html", movie=movie, form=form)
-
-
-@app.route("/delete")
-def delete_movie():
-    movie_id = request.args.get("id")
-    movie = db.get_or_404(Movie, movie_id)
-    db.session.delete(movie)
-    db.session.commit()
-    return redirect(url_for("home"))
+# Deletes a cafe with a particular id. Change the request type to "Delete" in Postman
+@app.route("/report-closed/<int:cafe_id>", methods=["DELETE"])
+def delete_cafe(cafe_id):
+    api_key = request.args.get("api-key")
+    if api_key == "TopSecretAPIKey":
+        cafe = db.get_or_404(Cafe, cafe_id)
+        if cafe:
+            db.session.delete(cafe)
+            db.session.commit()
+            return jsonify(response={"success": "Successfully deleted the cafe from the database."}), 200
+        else:
+            return jsonify(error={"Not Found": "Sorry a cafe with that id was not found in the database."}), 404
+    else:
+        return jsonify(error={"Forbidden": "Sorry, that's not allowed. Make sure you have the correct api_key."}), 403
 
 
 if __name__ == '__main__':
